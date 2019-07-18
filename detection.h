@@ -25,9 +25,9 @@
 
 #define IP_HDR_LEN sizeof(struct iphdr)
 #define TIME_INTERVAL 10 // 10 seconds
-#define BETA 0.90000
+#define BETA 0.98000
 #define ALPHA 0.500000
-#define K 3
+#define K 4
 #define HOST_IP "127.0.0.1"
 #define PORT 22
 
@@ -39,6 +39,8 @@ struct data {
 static int signal_sum = 0;
 static int timer = -1;
 static unsigned int packet_count = 0;
+
+pthread_mutex_t lock;
 
 struct detection {
     void (*_init)();

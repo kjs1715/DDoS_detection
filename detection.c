@@ -5,13 +5,21 @@ void init() {
     prev_data= (struct data*) malloc(sizeof(struct data));
     printf("Initialized..\n");
 
-    // sample
+    // init data
     cur_data->ewma = 0;
     cur_data->packet_count = 0;
     prev_data->ewma = 100;
     prev_data->packet_count = 0;
+
+    // init mutex
+    if (pthread_mutex_init(&lock, NULL)) {
+        perror("Mutex init failed...\n");
+    }
 }
 
+/*
+    @usage : analyse all packets which are sent to this host
+ */
 void *receive() {
     printf("Start receiving...\n");
     int recvfd = -1, recvlen = 0;
@@ -21,23 +29,29 @@ void *receive() {
     memset(skbuf, 0 ,sizeof(skbuf));
     tcp_recvpkt = (struct tcphdr*) malloc(sizeof(struct tcphdr));
 
+    // create socket, cast datagram into tcp header
     if ((recvfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_IP))) == -1) {
         perror("Error with recvfd...\n");
     }
     while (1) {
+        // receivde packets
         recvlen = recv(recvfd, skbuf, sizeof(skbuf), 0);
         if (recvlen > 0) {
             tcp_recvpkt = (struct tcphdr*) (skbuf + ETHER_HDR_LEN + IP_HDR_LEN);
+            // judge syn packet
             if (tcp_recvpkt->syn == 1) {
+                pthread_mutex_lock(&lock);
                 packet_count++;
-                // printf("package received!! SYN\n");
-            } else {
-                // printf("package received!! NOT SYN\n");
+                pthread_mutex_unlock(&lock);
             }  
         }
     }
 }
 
+
+/*
+    @usage : calculation based on EWMA algorithm
+ */
 void detect() {
     timer++;
     assert(cur_data);
@@ -74,6 +88,7 @@ void run() {
     int seconds = 0, s = -1, recvfd = -1, pd;
     struct sockaddr_in *sa;
 
+    // thread is needed for receiving packets asynchronously
     pthread_t tid;
     pd = pthread_create(&tid, NULL, receive, NULL);
     while(1) {
