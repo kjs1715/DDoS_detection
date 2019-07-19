@@ -8,7 +8,7 @@ void init() {
     // init data
     cur_data->ewma = 0;
     cur_data->packet_count = 0;
-    prev_data->ewma = 100;
+    prev_data->ewma = 0;
     prev_data->packet_count = 0;
 
     // init mutex
@@ -48,7 +48,6 @@ void *receive() {
     }
 }
 
-
 /*
     @usage : calculation based on EWMA algorithm
  */
@@ -57,8 +56,14 @@ void detect() {
     assert(cur_data);
     assert(prev_data);
     cur_data->packet_count = packet_count;
+
+    // initialize first EWMA variable for accuracy of result
+    if (timer == 1) {
+        prev_data->ewma = packet_count;
+    }
+
+    // bzero count
     packet_count = 0;
-    printf("%d %d\n", cur_data->packet_count, packet_count);
 
     // calculate
     cur_data->ewma = BETA * prev_data->ewma + (1 - BETA) * cur_data->packet_count;
