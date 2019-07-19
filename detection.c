@@ -3,6 +3,9 @@
 void init() {
     cur_data= (struct data*) malloc(sizeof(struct data));
     prev_data= (struct data*) malloc(sizeof(struct data));
+    cur_cusum_data = (struct CUSUM_data*) malloc(sizeof(struct CUSUM_data));
+    prev_cusum_data = (struct CUSUM_data*) malloc(sizeof(struct CUSUM_data));
+
     printf("Initialized..\n");
 
     // init data
@@ -10,6 +13,9 @@ void init() {
     cur_data->packet_count = 0;
     prev_data->ewma = 0;
     prev_data->packet_count = 0;
+
+    cur_cusum_data->cond = 0;
+    prev_cusum_data->cond = 0;
 
     // init mutex
     if (pthread_mutex_init(&lock, NULL)) {
@@ -101,19 +107,47 @@ void run() {
         sleep(1);
         seconds += 1;
         if (seconds % TIME_INTERVAL == 0) {
-            detect();
+            // detect(); 
+            cusum_detect();
         }
     }
 }
 
-void *thr_fn(void *arg) {
+void cusum_detect() {
+    timer++;
+    assert(cur_data);
+    assert(prev_data);
+    assert(cur_cusum_data);
+    assert(prev_cusum_data);
 
+    cur_data->packet_count = packet_count;
+
+    // initialize first EWMA variable for accuracy of result
+    if (timer == 1) {
+        prev_data->ewma = packet_count;
+    }
+
+    // bzero count
+    printf("packet_count : %d\n", cur_data->packet_count);
+    packet_count = 0;
+    
+    // calculate
+    cur_data->ewma = BETA * prev_data->ewma + (1 - BETA) * cur_data->packet_count;
+    prev_data->ewma = cur_data->ewma;
+
+    cur_cusum_data->cond = prev_cusum_data->cond + (((ALPHA * prev_data->ewma) / var) * (cur_data->packet_count - prev_data->ewma - ALPHA * prev_data->ewma / 2));
+    if (cur_cusum_data->cond >= H ) {
+        printf("Time interval : %d / Current cusum data : %f / Status : SYN Flood Detected\n", timer, cur_cusum_data->cond);
+    } else {
+        printf("Time interval : %d / Current cusum data : %f / Status : OK\n", timer, cur_cusum_data->cond);
+    }
 }
 
 struct detection default_detection = {
     ._init = init,
     ._run = run,
     ._detect = detect,
+    ._cusum_detect = cusum_detect,
 };
 
 
@@ -121,5 +155,4 @@ int main(int argc, char const *argv[])
 {
     default_detection._init();
     default_detection._run();
-
 }
